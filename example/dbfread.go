@@ -28,8 +28,8 @@ func main() {
 	records1 := dbfgo.GetRecords(fp)
 	for _, val := range records1 {
 		if val.NotDeleted {
-			for _, nm := range namefields {
-				fmt.Print(val.Data[nm], ";")
+			for k:=0; k<len(namefields); k++ {
+				fmt.Print(val.Data[namefields[k]], ";")
 			}
 			fmt.Println("")
 		}

@@ -100,7 +100,7 @@ func Changebytetoint(b []byte) (x int64) {
 }
 
 //GetRecords retrieves ALL dbf records
-func GetRecords(fp *os.File) (records map[int]Record) {
+func GetRecords(fp *os.File) map[int]Record {
 	dbfhead := GetDbfHead(fp)
 	fp.Seek(0, 0)
 	fields := GetFields(fp)
@@ -108,19 +108,16 @@ func GetRecords(fp *os.File) (records map[int]Record) {
 	start := dbfhead.Headerlen
 	buf := make([]byte, recordlen)
 	i := 1
-	temp := map[int]Record{}
+	records := map[int]Record{}
 	for {
 		_, err := fp.ReadAt(buf, start)
 		if err != nil {
-			return temp
-		}
-		record := Record{}
-		if string(buf[0:1]) == " " {
-			record.NotDeleted = true
-		} else if string(buf[0:1]) == "*" {
-			record.NotDeleted = false
+			return records
 		}
 		tempdata := map[string]string{}
+		record := Record{}
+		//record is deleted if there is a '*'
+		record.NotDeleted = (string(buf[0:1]) != "*")
 		a := int64(1)
 		for _, val := range fields {
 			fieldlen := val.FieldLen
@@ -128,7 +125,7 @@ func GetRecords(fp *os.File) (records map[int]Record) {
 			a = a + fieldlen
 		}
 		record.Data = tempdata
-		temp[i] = record
+		records[i] = record
 		start = start + recordlen
 		i++
 	}
