@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jeffycf/dbfgo"
+	"github.com/squeeze69/dbfgo"
 )
 
 func main() {

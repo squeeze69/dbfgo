@@ -3,14 +3,15 @@
 package main
 
 import (
-"fmt"
-"os"
-"github.com/jeffycf/dbfgo"
+	"fmt"
+	"os"
+
+	"github.com/squeeze69/dbfgo"
 )
 
 func main() {
 	var infile = "111.dbf"
-	namefields := make([]string,0)
+	namefields := make([]string, 0)
 	if len(os.Args) > 1 {
 		infile = os.Args[1]
 	}
@@ -22,13 +23,13 @@ func main() {
 	fields := dbfgo.GetFields(fp)
 	for _, val := range fields {
 		fmt.Println(val.Name, val.Fieldtype, val.FieldLen)
-		namefields = append(namefields,val.Name)
+		namefields = append(namefields, val.Name)
 	}
 	records1 := dbfgo.GetRecords(fp)
 	for _, val := range records1 {
 		if val.NotDeleted {
-			for _,nm := range(namefields) {
-				fmt.Print(val.Data[nm],";")
+			for _, nm := range namefields {
+				fmt.Print(val.Data[nm], ";")
 			}
 			fmt.Println("")
 		}
