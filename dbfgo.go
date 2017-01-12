@@ -1,12 +1,12 @@
-package main
+package dbfgo
 
 import (
 	"fmt"
 	"os"
-	//"strconv"
 	"strings"
 )
 
+//DbfHead informations about dbf file
 type DbfHead struct {
 	Version    []byte
 	Updatedate string
@@ -14,6 +14,8 @@ type DbfHead struct {
 	Headerlen  int64
 	Recordlen  int64
 }
+
+//Field field informations
 type Field struct {
 	Name             string
 	Fieldtype        string
@@ -22,14 +24,16 @@ type Field struct {
 	DecimalCount     []byte
 	Workareaid       []byte
 }
+
+//Record structure holding single record
 type Record struct {
-	Delete bool
+	NotDeleted bool
 	//Data   string
 	Data map[string]string
 }
 
+//GetDbfHead retrieve the Dbf Header informations
 func GetDbfHead(reader *os.File) (dbfhead DbfHead) {
-	//fileinfo, _ := reader.Stat()
 	buf := make([]byte, 16)
 	reader.Seek(0, 0)
 	_, err := reader.Read(buf)
@@ -43,52 +47,46 @@ func GetDbfHead(reader *os.File) (dbfhead DbfHead) {
 	dbfhead.Records = Changebytetoint(buf[4:8])
 	return dbfhead
 }
-func RemoveNullfrombyte(b []byte) (s string) {
+
+//CopyUpToNull - copy till the first 0 byte (excluded) - like C's strcpy
+func CopyUpToNull(b []byte) (s string) {
 	for _, val := range b {
 		if val == 0 {
-			continue
+			return
 		}
 		s = s + string(val)
-		//fmt.Println(s)
 	}
 	return
 }
+
+//GetFields retrieve fields informations
 func GetFields(reader *os.File) []Field {
+	var curbuf []byte
 	dbfhead := GetDbfHead(reader)
 
 	off := dbfhead.Headerlen - 32 - 264
-	//fmt.Println(off)
 	fieldlist := make([]Field, off/32)
 	buf := make([]byte, off)
-	//fmt.Println(off)
 	_, err := reader.ReadAt(buf, 32)
 	if err != nil {
 		panic(err)
 	}
-	//fmt.Printf("%d\n", len(buf))
-	//fmt.Println(fieldlist)
-	curbuf := make([]byte, 32)
 	for i, val := range fieldlist {
 		a := i * 32
-		//fmt.Println(i, a)
 		curbuf = buf[a:]
-		//val.Name = fmt.Sprintf("%s", curbuf[0:10])
-		val.Name = RemoveNullfrombyte(curbuf[0:11])
-		//val.Name = string(curbuf[0:11])
+		val.Name = CopyUpToNull(curbuf[0:11])
 		val.Fieldtype = fmt.Sprintf("%s", curbuf[11:12])
 		val.FieldDataaddress = curbuf[12:16]
 		val.FieldLen = Changebytetoint(curbuf[16:17])
 		val.DecimalCount = curbuf[17:18]
 		val.Workareaid = curbuf[20:21]
-		//fmt.Printf("%s\n", val.Name)
 		fieldlist[i] = val
 
 	}
-	//for _, val := range fieldlist {
-	//fmt.Printf("%s\n", val.Name)
-	//}
 	return fieldlist
 }
+
+//Changebytetoint - transform a byte array in an int64 value
 func Changebytetoint(b []byte) (x int64) {
 	for i, val := range b {
 		if i == 0 {
@@ -96,12 +94,12 @@ func Changebytetoint(b []byte) (x int64) {
 		} else {
 			x = x + int64(2<<7*int64(i)*int64(val))
 		}
-		//fmt.Println(x)
 	}
-	//fmt.Println(fieldlist)
 
 	return
 }
+
+//GetRecords retrieves ALL dbf records
 func GetRecords(fp *os.File) (records map[int]Record) {
 	dbfhead := GetDbfHead(fp)
 	fp.Seek(0, 0)
@@ -115,79 +113,42 @@ func GetRecords(fp *os.File) (records map[int]Record) {
 		_, err := fp.ReadAt(buf, start)
 		if err != nil {
 			return temp
-			panic(err)
 		}
-		//fmt.Printf("%s\n", buf)
 		record := Record{}
-		//fmt.Println(string(buf[0:1]))
 		if string(buf[0:1]) == " " {
-			record.Delete = true
+			record.NotDeleted = true
 		} else if string(buf[0:1]) == "*" {
-			record.Delete = false
+			record.NotDeleted = false
 		}
-		//record.Data = fmt.Sprintf("%s", buf[1:])
-		//temp[i] = record
-		//fmt.Println(i, len(temp), temp[i])
 		tempdata := map[string]string{}
 		a := int64(1)
 		for _, val := range fields {
 			fieldlen := val.FieldLen
-			//fmt.Println(fieldlen)
-			//fmt.Println(len(val.Name))
 			tempdata[val.Name] = strings.Trim(fmt.Sprintf("%s", buf[a:a+fieldlen]), " ")
-			//fmt.Println(len(tempdata[val.Name]))
-			//fmt.Println(record)
 			a = a + fieldlen
 		}
 		record.Data = tempdata
 		temp[i] = record
-		//fmt.Println(i)
-		//fmt.Println(record)
 		start = start + recordlen
-		i = i + 1
+		i++
 	}
 }
+
+//GetRecordbyField - retrieve records by a field value (simple sequential search)
 func GetRecordbyField(fieldname string, fieldval string, fp *os.File) (record map[int]Record) {
-	//GetDbfHead(fp)
 	fields := GetFields(fp)
 	records := GetRecords(fp)
 	temp := map[int]Record{}
 	i := 1
 	for _, val := range records {
 		for _, val1 := range fields {
-			if val1.Name == fieldname && val.Delete {
+			if val1.Name == fieldname && val.NotDeleted {
 				if val.Data[val1.Name] == fieldval || val.Data[val1.Name] == " " {
-					//fmt.Println(val.Data)
 					temp[i] = val
 				}
-
 			}
 		}
-		i = i + 1
+		i++
 	}
 	return temp
-}
-func main() {
-
-	fp, err := os.OpenFile("111.dbf", os.O_RDONLY, 0)
-	if err != nil {
-		panic(err)
-	}
-	defer fp.Close()
-	fields := GetFields(fp)
-	for _, val := range fields {
-		fmt.Println(val.Name, val.Fieldtype, val.FieldLen)
-	}
-	records := GetRecordbyField("****", "****", fp)
-	for _, val := range records {
-		fmt.Println(val.Data["****"])
-	}
-	records1 := GetRecords(fp)
-	for _, val := range records1 {
-		if val.Delete {
-			fmt.Println(val.Data["CONFIGCODE"], val.Data["DIRECTORY"])
-		}
-
-	}
-
 }
