@@ -32,6 +32,44 @@ type Record struct {
 	Data map[string]string
 }
 
+//Dbfgo to catch all of the dbfinfo
+type Dbfgo struct {
+	Header DbfHead
+	Fields []Field
+	reader *os.File
+}
+
+//GetDBFInfo - recuper le informazioni sul dbf
+func (r *Dbfgo) GetDBFInfo(reader *os.File) {
+	r.reader = reader
+	r.Header = GetDbfHead(r.reader)
+	r.Fields = GetFields(r.reader)
+}
+
+//GetRecordN retrieves record N
+func (r *Dbfgo) GetRecordN(n int64) Record {
+	var record Record
+	r.reader.Seek(0, 0)
+	recordlen := r.Header.Recordlen
+	start := r.Header.Headerlen + n*r.Header.Recordlen
+	buf := make([]byte, recordlen)
+	_, err := r.reader.ReadAt(buf, start)
+	if err != nil {
+		return record
+	}
+	tempdata := map[string]string{}
+	//record is deleted if there is a '*'
+	record.NotDeleted = (string(buf[0:1]) != "*")
+	a := int64(1)
+	for _, val := range r.Fields {
+		fieldlen := val.FieldLen
+		tempdata[val.Name] = strings.Trim(fmt.Sprintf("%s", buf[a:a+fieldlen]), " ")
+		a = a + fieldlen
+	}
+	record.Data = tempdata
+	return record
+}
+
 //GetDbfHead retrieve the Dbf Header informations
 func GetDbfHead(reader *os.File) (dbfhead DbfHead) {
 	buf := make([]byte, 16)
@@ -45,11 +83,11 @@ func GetDbfHead(reader *os.File) (dbfhead DbfHead) {
 	dbfhead.Headerlen = Changebytetoint(buf[8:10])
 	dbfhead.Recordlen = Changebytetoint(buf[10:12])
 	dbfhead.Records = Changebytetoint(buf[4:8])
-	return dbfhead
+	return
 }
 
-//CopyUpToNull - copy till the first 0 byte (excluded) - like C's strcpy
-func CopyUpToNull(b []byte) (s string) {
+//copyUpToNull - copy till the first 0 byte (excluded) - like C's strcpy
+func copyUpToNull(b []byte) (s string) {
 	for _, val := range b {
 		if val == 0 {
 			return
@@ -74,14 +112,13 @@ func GetFields(reader *os.File) []Field {
 	for i, val := range fieldlist {
 		a := i * 32
 		curbuf = buf[a:]
-		val.Name = CopyUpToNull(curbuf[0:11])
+		val.Name = copyUpToNull(curbuf[0:11])
 		val.Fieldtype = fmt.Sprintf("%s", curbuf[11:12])
 		val.FieldDataaddress = curbuf[12:16]
 		val.FieldLen = Changebytetoint(curbuf[16:17])
 		val.DecimalCount = curbuf[17:18]
 		val.Workareaid = curbuf[20:21]
 		fieldlist[i] = val
-
 	}
 	return fieldlist
 }
@@ -95,7 +132,6 @@ func Changebytetoint(b []byte) (x int64) {
 			x = x + int64(2<<7*int64(i)*int64(val))
 		}
 	}
-
 	return
 }
 
