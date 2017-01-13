@@ -42,8 +42,8 @@ type Dbfgo struct {
 //GetDBFInfo - recuper le informazioni sul dbf
 func (r *Dbfgo) GetDBFInfo(reader *os.File) {
 	r.reader = reader
-	r.Header = GetDbfHead(r.reader)
-	r.Fields = GetFields(r.reader)
+	r.Header = GetDbfHead(reader)
+	r.Fields = GetFields(reader)
 }
 
 //GetRecordN retrieves record N
@@ -103,6 +103,9 @@ func GetFields(reader *os.File) []Field {
 	dbfhead := GetDbfHead(reader)
 
 	off := dbfhead.Headerlen - 32 - 264
+	if off < 1 {
+		panic("invalid header")
+	}
 	fieldlist := make([]Field, off/32)
 	buf := make([]byte, off)
 	_, err := reader.ReadAt(buf, 32)

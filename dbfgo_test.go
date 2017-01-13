@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TESTdbfgo1(t *testing.T) {
+func TestDbfgo1(t *testing.T) {
 	var tdbf Dbfgo
 	nf, err := os.Open("test.dbf")
 	if err != nil {
@@ -13,7 +13,7 @@ func TESTdbfgo1(t *testing.T) {
 	}
 	defer nf.Close()
 	tdbf.GetDBFInfo(nf)
-	if tdbf.Header.Records != 3 {
-		t.Fatal("Numero sbagliato di record")
+	if tdbf.Header.Records != 4 {
+		t.Fatal("Numero sbagliato di record ",tdbf.Header.Records," Expected: 4")
 	}
 }
